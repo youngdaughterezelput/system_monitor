@@ -1,0 +1,15 @@
+system_monitor/
+├── __init__.py
+├── main.py
+├── gui/
+│   ├── __init__.py
+│   ├── main_window.py
+│   ├── system_tab.py
+│   ├── disk_tab.py
+│   ├── network_tab.py
+│   └── dashboard_window.py
+└── core/
+    ├── __init__.py
+    ├── system_info.py
+    ├── disk_info.py
+    └── network_diagnostics.py
