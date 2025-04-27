@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                             QPushButton, QTextEdit, QTabWidget)
 from PyQt5.QtCore import QTimer, Qt
-from system_core.system_info import SystemInfoCollector
-from system_core.disk_info import DiskInfoCollector
-from system_core.network_diagnostics import NetworkDiagnostics
+from system_info import SystemInfoCollector
+from disk_info import DiskInfoCollector
+from network_diagnostics import NetworkDiagnostics
 
 class DashboardWindow(QWidget):
     def __init__(self):

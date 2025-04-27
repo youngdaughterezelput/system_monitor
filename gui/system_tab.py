@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit
-from system_core.system_info import SystemInfoCollector
+from system_info import SystemInfoCollector
 
 class SystemTab(QWidget):
     def __init__(self):

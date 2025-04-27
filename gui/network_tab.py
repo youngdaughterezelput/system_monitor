@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget,
                             QTreeWidgetItem, QPushButton, QLineEdit, 
                             QTextEdit, QLabel, QHeaderView)
 from PyQt5.QtCore import Qt
-from system_core.network_diagnostics import NetworkDiagnostics
+from network_diagnostics import NetworkDiagnostics
 
 class NetworkTab(QWidget):
     def __init__(self):

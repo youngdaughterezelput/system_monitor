@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import QMainWindow, QTabWidget, QAction, QMenuBar
-from gui.system_tab import SystemTab
-from gui.disk_tab import DiskTab
-from gui.network_tab import NetworkTab
-from gui.dashboard_window import DashboardWindow
+from system_tab import SystemTab
+from disk_tab import DiskTab
+from network_tab import NetworkTab
+from dashboard_window import DashboardWindow
 
 class MainWindow(QMainWindow):
     def __init__(self):

@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTreeWidget, 
                             QTreeWidgetItem, QHeaderView)
-from system_core.disk_info import DiskInfoCollector
+from disk_info import DiskInfoCollector
 
 class DiskTab(QWidget):
     def __init__(self):
