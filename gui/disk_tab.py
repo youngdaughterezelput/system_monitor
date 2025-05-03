@@ -163,18 +163,22 @@ class DiskTab(QWidget):
                 self.compare_selector2.addItem(text, part.mountpoint)
 
     def run_analysis(self):
-        mountpoint = self.disk_selector.currentData()
-        if not mountpoint:
-            QMessageBox.warning(self, "Ошибка", "Выберите диск для анализа")
-            return
-        
         try:
+            mountpoint = self.disk_selector.currentData()
+            if not mountpoint:
+                raise ValueError("No disk selected")
+
+            # Проверка существования точки монтирования
+            if not os.path.exists(mountpoint):
+                raise FileNotFoundError(f"Mount point {mountpoint} does not exist")
+
             analysis_data = self.analyzer.analyze_partition(mountpoint)
             self.update_tables(analysis_data)
             self.update_plots(analysis_data)
             self.show_health_info(mountpoint)
+            
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка анализа", str(e))
+            QMessageBox.critical(self, "Ошибка", str(e))
 
     def update_tables(self, data):
         # Summary table
@@ -212,17 +216,20 @@ class DiskTab(QWidget):
         self.canvas.draw()
 
     def show_health_info(self, device: str):
-        health = self.health_analyzer.get_health(device)
-        if not health:
-            QMessageBox.warning(self, "Ошибка", "Данные S.M.A.R.T. недоступны")
-            return
-        
-        self.health_table.setRowCount(len(health.attributes))
-        for row, (name, attr) in enumerate(health.attributes.items()):
-            status = "✔️" if attr.value > attr.threshold else "⚠️" if attr.value == attr.threshold else "❌"
-            self.health_table.setItem(row, 0, QTableWidgetItem(name))
-            self.health_table.setItem(row, 1, QTableWidgetItem(str(attr.value)))
-            self.health_table.setItem(row, 2, QTableWidgetItem(status))
+        try:
+            health = self.health_analyzer.get_health(device)
+            if not self.health_analyzer.smartctl_path:
+                raise RuntimeError("S.M.A.R.T. data not available for this device")
+            
+            self.health_table.setRowCount(len(health.attributes))
+            for row, (name, attr) in enumerate(health.attributes.items()):
+                status = "✔️" if attr.value > attr.threshold else "⚠️" if attr.value == attr.threshold else "❌"
+                self.health_table.setItem(row, 0, QTableWidgetItem(name))
+                self.health_table.setItem(row, 1, QTableWidgetItem(str(attr.value)))
+                self.health_table.setItem(row, 2, QTableWidgetItem(status))
+
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка здоровья диска", str(e))
 
     def compare_disks(self):
         disk1 = self.compare_selector1.currentData()

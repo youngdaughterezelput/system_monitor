@@ -34,6 +34,13 @@ class DiskInfoCollector:
                 })
         return partitions
     
+    def get_partition_info(self, mountpoint: str) -> dict:
+        """Получение информации о конкретном разделе"""
+        for part in self.get_partitions():
+            if part['mountpoint'] == mountpoint:
+                return part
+        raise ValueError(f"Partition {mountpoint} not found")
+    
     @staticmethod
     def get_io_counters() -> Optional[Dict]:
         """Get disk I/O counters"""
