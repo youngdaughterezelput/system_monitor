@@ -2,6 +2,8 @@ import sys
 import os
 from PyQt5.QtWidgets import QApplication
 from main_window import MainWindow
+import matplotlib
+matplotlib.use('Qt5Agg')
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
