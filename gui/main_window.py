@@ -32,6 +32,8 @@ class MainWindow(QMainWindow):
     def init_menu(self):
         # Create menu bar
         menubar = self.menuBar()
+
+        file_minu = menubar.addMenu("File")
         
         # Add view menu
         view_menu = menubar.addMenu("View")
@@ -40,8 +42,17 @@ class MainWindow(QMainWindow):
         dashboard_action = QAction("Open Dashboard", self)
         dashboard_action.triggered.connect(self.open_dashboard)
         view_menu.addAction(dashboard_action)
+
+
+        file_action = QAction("Exit", self)
+        file_action.triggered.connect(self.exit_out)
+        file_minu.addAction(file_action)
     
     def open_dashboard(self):
         """Open the dashboard window"""
         self.dashboard = DashboardWindow()
         self.dashboard.show()
+
+
+    def exit_out(self):
+        self.close()
