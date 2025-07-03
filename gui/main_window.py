@@ -2,7 +2,6 @@ from PyQt5.QtWidgets import QMainWindow, QTabWidget, QAction, QMenuBar
 from system_tab import SystemTab
 from disk_tab import DiskTab
 from network_tab import NetworkTab
-from dashboard_window import DashboardWindow
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -34,24 +33,12 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
 
         file_minu = menubar.addMenu("File")
-        
-        # Add view menu
-        view_menu = menubar.addMenu("View")
-        
-        # Add dashboard action
-        dashboard_action = QAction("Open Dashboard", self)
-        dashboard_action.triggered.connect(self.open_dashboard)
-        view_menu.addAction(dashboard_action)
 
 
         file_action = QAction("Exit", self)
         file_action.triggered.connect(self.exit_out)
         file_minu.addAction(file_action)
-    
-    def open_dashboard(self):
-        """Open the dashboard window"""
-        self.dashboard = DashboardWindow()
-        self.dashboard.show()
+   
 
 
     def exit_out(self):
