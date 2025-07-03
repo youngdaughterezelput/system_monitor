@@ -1,11 +1,13 @@
 import os
+import platform
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QPushButton, QMessageBox, QComboBox, QTableWidget,
     QTableWidgetItem, QLabel, QTabWidget, QHeaderView,
-    QTreeWidget, QTreeWidgetItem, QTextEdit
+    QTreeWidget, QTreeWidgetItem, QTextEdit, QProgressBar
 )
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor
 import psutil
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -25,6 +27,9 @@ class DiskTab(QWidget):
         self.comparator = DiskComparator()
         self.canvas = None
         self.tabs = QTabWidget()
+        self.current_disk = None
+        self.health_timer = QTimer()
+        self.health_timer.timeout.connect(self.update_health_info)
         self.init_ui()
     
     def init_ui(self):
@@ -66,6 +71,14 @@ class DiskTab(QWidget):
         health_tab = QWidget()
         layout = QVBoxLayout(health_tab)
         
+        # Индикатор общего состояния
+        self.health_status_bar = QProgressBar()
+        self.health_status_bar.setRange(0, 100)
+        self.health_status_bar.setTextVisible(True)
+        self.health_status_bar.setFormat("Состояние диска: %p%")
+        layout.addWidget(self.health_status_bar)
+        
+        # Таблица с атрибутами SMART
         self.health_table = QTableWidget()
         self.health_table.setColumnCount(3)
         self.health_table.setHorizontalHeaderLabels(["Параметр", "Значение", "Статус"])
@@ -139,10 +152,28 @@ class DiskTab(QWidget):
         self.analyze_btn = QPushButton("Анализировать диск")
         self.analyze_btn.clicked.connect(self.run_analysis)
         
+        # Кнопка для постоянного мониторинга здоровья
+        self.monitor_btn = QPushButton("Мониторить здоровье")
+        self.monitor_btn.setCheckable(True)
+        self.monitor_btn.toggled.connect(self.toggle_health_monitoring)
+        
         layout.addWidget(QLabel("Выберите диск:"))
         layout.addWidget(self.disk_selector)
         layout.addWidget(self.analyze_btn)
+        layout.addWidget(self.monitor_btn)
         return widget
+    
+    def toggle_health_monitoring(self, checked):
+        if checked:
+            self.monitor_btn.setText("Остановить мониторинг")
+            self.health_timer.start(5000)  # Обновление каждые 5 секунд
+        else:
+            self.monitor_btn.setText("Мониторить здоровье")
+            self.health_timer.stop()
+
+    def update_health_info(self):
+        if self.current_disk:
+            self.show_health_info(self.current_disk)
 
     def update_disk_list(self):
         self.disk_selector.clear()
@@ -172,6 +203,7 @@ class DiskTab(QWidget):
             if not os.path.exists(mountpoint):
                 raise FileNotFoundError(f"Mount point {mountpoint} does not exist")
 
+            self.current_disk = mountpoint
             analysis_data = self.analyzer.analyze_partition(mountpoint)
             self.update_tables(analysis_data)
             self.update_plots(analysis_data)
@@ -218,15 +250,52 @@ class DiskTab(QWidget):
     def show_health_info(self, device: str):
         try:
             health = self.health_analyzer.get_health(device)
-            if not self.health_analyzer.smartctl_path:
-                raise RuntimeError("S.M.A.R.T. data not available for this device")
+            if health is None:
+                QMessageBox.warning(
+                    self, 
+                    "Ошибка здоровья диска", 
+                    "Не удалось получить данные о здоровье диска. "
+                    "Убедитесь, что smartmontools установлены и доступны в PATH."
+                )
+                return
             
+            # Обновляем индикатор здоровья
+            health_value = health.lifespan or 100
+            if health.health_status == "PASSED":
+                health_value = 100
+            elif health.health_status == "FAILED":
+                health_value = 0
+                
+            self.health_status_bar.setValue(int(health_value))
+            
+            # Форматируем статус в зависимости от значения
+            if health_value > 80:
+                self.health_status_bar.setStyleSheet("QProgressBar::chunk { background-color: green; }")
+            elif health_value > 40:
+                self.health_status_bar.setStyleSheet("QProgressBar::chunk { background-color: orange; }")
+            else:
+                self.health_status_bar.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+            
+            # Заполняем таблицу атрибутов
             self.health_table.setRowCount(len(health.attributes))
             for row, (name, attr) in enumerate(health.attributes.items()):
-                status = "✔️" if attr.value > attr.threshold else "⚠️" if attr.value == attr.threshold else "❌"
+                # Определяем статус атрибута
+                if attr.value > attr.threshold:
+                    status = "✔️"
+                    color = "green"
+                elif attr.value == attr.threshold:
+                    status = "⚠️"
+                    color = "orange"
+                else:
+                    status = "❌"
+                    color = "red"
+                
                 self.health_table.setItem(row, 0, QTableWidgetItem(name))
                 self.health_table.setItem(row, 1, QTableWidgetItem(str(attr.value)))
-                self.health_table.setItem(row, 2, QTableWidgetItem(status))
+                
+                status_item = QTableWidgetItem(status)
+                status_item.setForeground(QColor(color))
+                self.health_table.setItem(row, 2, status_item)
 
         except Exception as e:
             QMessageBox.warning(self, "Ошибка здоровья диска", str(e))
