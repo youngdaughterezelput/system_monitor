@@ -1,39 +1,42 @@
 @echo off
 SETLOCAL ENABLEDELAYEDEXPANSION
 
-:: 1. Проверка Python
+:: Проверка Python
 where python >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Python не найден в PATH
+    echo [ERROR] Python not found in PATH
     pause
     exit /b 1
 )
 
-:: 2. Установка зависимостей
-echo Устанавливаем PyInstaller и зависимости...
-python -m pip install --upgrade pyinstaller psutil matplotlib pyqt5
+:: Установка зависимостей
+echo Installing dependencies...
+python -m pip install --upgrade pip
+python -m pip install pyinstaller psutil matplotlib pyqt5
 
-:: 3. Компиляция через Python модуль (без вызова pyinstaller напрямую)
-echo Запускаем сборку...
+:: Компиляция
+echo Building executable...
 python -m PyInstaller ^
     --onefile ^
     --noconsole ^
+    --uac-admin ^
     --name "SystemMonitor" ^
     --distpath "build" ^
     --workpath "build/temp" ^
     --hidden-import "matplotlib.backends.backend_qt5agg" ^
     --hidden-import "PyQt5.QtWidgets" ^
-    --add-data "*.ui;." ^
+    --hidden-import "PyQt5.QtCore" ^
+    --hidden-import "PyQt5.QtGui" ^
+    --add-data "app.manifest;." ^
     main.py
 
 if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Сборка не удалась!
-    echo Проверьте ошибки выше
+    echo [ERROR] Build failed!
     pause
     exit /b 1
 )
 
 echo.
-echo [SUCCESS] Сборка завершена!
-echo Исполняемый файл: build\SystemMonitor.exe
+echo [SUCCESS] Build completed!
+echo Executable: build\SystemMonitor.exe
 pause
