@@ -190,8 +190,9 @@ class DiskTab(QWidget):
         for part in psutil.disk_partitions():
             if part.fstype and part.device:
                 text = f"{part.device} ({part.mountpoint})"
-                self.compare_selector1.addItem(text, part.mountpoint)
-                self.compare_selector2.addItem(text, part.mountpoint)
+                # Сохраняем кортеж (устройство, точка монтирования)
+                self.compare_selector1.addItem(text, (part.device, part.mountpoint))
+                self.compare_selector2.addItem(text, (part.device, part.mountpoint))
 
     def run_analysis(self):
         try:
@@ -300,22 +301,60 @@ class DiskTab(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Ошибка здоровья диска", str(e))
 
+    def get_device_by_mountpoint(self, mountpoint: str) -> str:
+        """Получает имя устройства по точке монтирования"""
+        for part in psutil.disk_partitions():
+            if part.mountpoint == mountpoint:
+                return part.device
+        return mountpoint  # fallback
+
     def compare_disks(self):
-        disk1 = self.compare_selector1.currentData()
-        disk2 = self.compare_selector2.currentData()
+        # Получаем кортеж (device, mountpoint)
+        disk_data1 = self.compare_selector1.currentData()
+        disk_data2 = self.compare_selector2.currentData()
         
-        if not disk1 or not disk2:
+        if not disk_data1 or not disk_data2:
             QMessageBox.warning(self, "Ошибка", "Выберите два диска для сравнения")
             return
         
         try:
-            comparison = self.comparator.compare_disks(disk1, disk2)
+            # Извлекаем имя устройства из кортежа
+            device1 = disk_data1[0] if isinstance(disk_data1, tuple) else disk_data1
+            device2 = disk_data2[0] if isinstance(disk_data2, tuple) else disk_data2
+            
+            comparison = self.comparator.compare_disks(device1, device2)
             report = self.generate_comparison_report(comparison)
             self.compare_result.setPlainText(report)
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка сравнения", str(e))
+            QMessageBox.critical(
+                self, 
+                "Ошибка сравнения", 
+                f"Произошла ошибка при сравнении дисков:\n{str(e)}"
+            )
 
     def generate_comparison_report(self, comparison):
+        # Проверка наличия необходимых данных
+        def safe_get(data, key, default="N/A"):
+            return data.get(key, [default, default])
+        
+        # Форматирование значений
+        def format_value(value):
+            if value is None: 
+                return "N/A"
+            if isinstance(value, (int, float)):
+                return f"{value:.2f}" if value > 100 else f"{value}"
+            return str(value)
+        
+        # Получение параметров с проверкой
+        params = comparison.parameters if hasattr(comparison, 'parameters') else {}
+        
+        # Извлечение данных с защитой от ошибок
+        total_size = safe_get(params, 'total_size', [0, 0])
+        used_space = safe_get(params, 'used_space', [0, 0])
+        temperature = safe_get(params, 'temperature', [None, None])
+        bad_sectors = safe_get(params, 'bad_sectors', [0, 0])
+        lifespan = safe_get(params, 'lifespan', [None, None])
+        
         report = f"""
         Отчет сравнения дисков:
         ========================
@@ -324,14 +363,16 @@ class DiskTab(QWidget):
 
         Параметры:
         ----------
-        Общий размер: {self.format_size(comparison.parameters['total_size'][0])} vs {self.format_size(comparison.parameters['total_size'][1])}
-        Использовано: {self.format_size(comparison.parameters['used_space'][0])} vs {self.format_size(comparison.parameters['used_space'][1])}
-        Температура: {comparison.parameters['temperature'][0] or 'N/A'}°C vs {comparison.parameters['temperature'][1] or 'N/A'}°C
-        Битые сектора: {comparison.parameters['bad_sectors'][0]} vs {comparison.parameters['bad_sectors'][1]}
-        Срок службы: {comparison.parameters['lifespan'][0] or 'N/A'}% vs {comparison.parameters['lifespan'][1] or 'N/A'}%
+        Общий размер: {self.format_size(total_size[0])} vs {self.format_size(total_size[1])}
+        Использовано: {self.format_size(used_space[0])} vs {self.format_size(used_space[1])}
+        Температура: {format_value(temperature[0])}°C vs {format_value(temperature[1])}°C
+        Битые сектора: {format_value(bad_sectors[0])} vs {format_value(bad_sectors[1])}
+        Срок службы: {format_value(lifespan[0])}% vs {format_value(lifespan[1])}%
         """
         return report
 
     @staticmethod
     def format_size(size_bytes):
+        if not isinstance(size_bytes, (int, float)):
+            return "N/A"
         return f"{size_bytes / (1024**3):.2f} GB" if size_bytes else "0.00 GB"
