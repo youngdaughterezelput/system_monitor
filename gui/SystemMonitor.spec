@@ -5,8 +5,8 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('*.ui', '.')],
-    hiddenimports=['matplotlib.backends.backend_qt5agg', 'PyQt5.QtWidgets'],
+    datas=[('app.manifest', '.')],
+    hiddenimports=['matplotlib.backends.backend_qt5agg', 'PyQt5.QtWidgets', 'PyQt5.QtCore', 'PyQt5.QtGui'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    uac_admin=True,
 )
