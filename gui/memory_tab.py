@@ -1,4 +1,5 @@
 import os
+import sys
 
 import psutil
 import time
@@ -310,80 +311,62 @@ class MemoryTab(QWidget):
 
 
 class TelegramSettingsDialog(QDialog):
-    """Диалоговое окно для настройки Telegram уведомлений с защитой от изменений"""
-
     def __init__(self, parent=None, settings=None):
         super().__init__(parent)
+        self.secret_manager = SecretManager()
+        self.setup_ui()
+
+        # Зашифрованные дефолтные значения (генерируются заранее)
+        self.encrypted_defaults = {
+            'bot_token': 'gAAAAABmY7JX...',  # Ваш зашифрованный токен
+            'chat_id': 'gAAAAABmY7JX...'  # Ваш зашифрованный chat_id
+        }
+
+        self.current_settings = settings if settings else self.load_default_settings()
+        self.apply_settings(self.current_settings)
+        self.toggle_editing(False)
+
+    def setup_ui(self):
         self.setWindowTitle("Настройки Telegram")
         self.setFixedSize(450, 300)
 
-        # Инициализируем менеджер секретов
-        self.secret_manager = SecretManager()
-
-        # Зашифрованные дефолтные значения (получите их один раз через encrypt_secrets.py)
-        self.encrypted_defaults = {
-            'bot_token': 'gAAAAABolJxA0cu8FNEVjGQyx8C3CqrwRpdzHEecUwtzOu4bzIAau5q6WVom4GCGrGc5gHGtjT4CKFFzmi_krXeWBV0Yp8Semf38GhtmB96K8rhI6fDEOxsfO9XB42XnL9us7QGU_cVM',  # Ваш зашифрованный токен
-            'chat_id': 'gAAAAABolJxAxlYxgrhypwMeMNHg-ScfBUuDho3snLvJQHsCHnhZomZ__dxEGrRkuMSAYeZKnG_2FhYqjE0OtLa_t4ZhwhLLLA=='  # Ваш зашифрованный chat_id
-        }
-
-        self.default_settings = {
-            'bot_token': self.secret_manager.decrypt(self.encrypted_defaults['bot_token']),
-            'chat_id': self.secret_manager.decrypt(self.encrypted_defaults['chat_id']),
-            'threshold': 500,
-            'interval': 30,
-            'auto_start': False
-        }
-
-        self.current_settings = settings if settings else self.default_settings.copy()
-        self.init_ui()
-
-    def init_ui(self):
         layout = QVBoxLayout()
 
-        # Чекбокс для разрешения редактирования
-        self.edit_checkbox = QCheckBox("Разрешить редактирование настроек")
-        self.edit_checkbox.stateChanged.connect(self.toggle_editing)
-        layout.addWidget(self.edit_checkbox)
+        # Чекбокс редактирования
+        self.edit_check = QCheckBox("Разрешить редактирование")
+        self.edit_check.stateChanged.connect(self.toggle_editing)
+        layout.addWidget(self.edit_check)
 
         # Форма с настройками
-        form_layout = QFormLayout()
+        form = QFormLayout()
 
-        # Токен бота
         self.bot_token_edit = QLineEdit()
         self.bot_token_edit.setPlaceholderText("Введите токен бота")
-        form_layout.addRow("Токен бота:", self.bot_token_edit)
+        form.addRow("Токен бота:", self.bot_token_edit)
 
-        # ID чата
         self.chat_id_edit = QLineEdit()
         self.chat_id_edit.setPlaceholderText("Введите ID чата")
-        form_layout.addRow("ID чата/канала:", self.chat_id_edit)
+        form.addRow("ID чата:", self.chat_id_edit)
 
-        # Порог памяти
         self.threshold_edit = QLineEdit()
-        self.threshold_edit.setPlaceholderText("500")
-        form_layout.addRow("Порог памяти (МБ):", self.threshold_edit)
+        form.addRow("Порог (МБ):", self.threshold_edit)
 
-        # Интервал сканирования
         self.interval_edit = QLineEdit()
-        self.interval_edit.setPlaceholderText("30")
-        form_layout.addRow("Интервал сканирования (сек):", self.interval_edit)
+        form.addRow("Интервал (сек):", self.interval_edit)
 
-        # Автозапуск
-        self.auto_start_check = QComboBox()
-        self.auto_start_check.addItems(["Выключен", "Включен"])
-        form_layout.addRow("Автозапуск с приложением:", self.auto_start_check)
+        self.auto_start_combo = QComboBox()
+        self.auto_start_combo.addItems(["Выключен", "Включен"])
+        form.addRow("Автозапуск:", self.auto_start_combo)
 
-        layout.addLayout(form_layout)
+        layout.addLayout(form)
 
-        # Кнопки управления
+        # Кнопки
         btn_layout = QHBoxLayout()
 
-        # Кнопка сброса
-        self.reset_btn = QPushButton("Сбросить к дефолтным")
+        self.reset_btn = QPushButton("Сбросить")
         self.reset_btn.clicked.connect(self.reset_to_default)
         btn_layout.addWidget(self.reset_btn)
 
-        # Кнопки сохранения/отмены
         self.save_btn = QPushButton("Сохранить")
         self.save_btn.clicked.connect(self.accept)
         btn_layout.addWidget(self.save_btn)
@@ -393,69 +376,47 @@ class TelegramSettingsDialog(QDialog):
         btn_layout.addWidget(self.cancel_btn)
 
         layout.addLayout(btn_layout)
-
         self.setLayout(layout)
 
-        # Устанавливаем текущие настройки
-        self.set_settings(self.current_settings)
-        self.toggle_editing(False)  # По умолчанию поля неактивны
+    def load_default_settings(self):
+        """Загружает и расшифровывает дефолтные настройки"""
+        return {
+            'bot_token': self.secret_manager.decrypt(self.encrypted_defaults['bot_token']),
+            'chat_id': self.secret_manager.decrypt(self.encrypted_defaults['chat_id']),
+            'threshold': 500,
+            'interval': 30,
+            'auto_start': False
+        }
 
-    def toggle_editing(self, state):
-        """Активирует/деактивирует поля для редактирования"""
-        enabled = bool(state)
+    def apply_settings(self, settings):
+        """Применяет настройки к UI"""
+        self.bot_token_edit.setText(settings.get('bot_token', ''))
+        self.chat_id_edit.setText(settings.get('chat_id', ''))
+        self.threshold_edit.setText(str(settings.get('threshold', 500)))
+        self.interval_edit.setText(str(settings.get('interval', 30)))
+        self.auto_start_combo.setCurrentIndex(1 if settings.get('auto_start', False) else 0)
+
+    def toggle_editing(self, enabled):
+        """Включает/выключает редактирование"""
         self.bot_token_edit.setEnabled(enabled)
         self.chat_id_edit.setEnabled(enabled)
         self.threshold_edit.setEnabled(enabled)
         self.interval_edit.setEnabled(enabled)
-        self.auto_start_check.setEnabled(enabled)
+        self.auto_start_combo.setEnabled(enabled)
         self.reset_btn.setEnabled(enabled)
 
     def reset_to_default(self):
-        """Сбрасывает настройки к дефолтным значениям"""
-        reply = QMessageBox.question(
-            self,
-            "Сброс настроек",
-            "Вы уверены, что хотите сбросить настройки к значениям по умолчанию?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
-            self.set_settings(self.default_settings)
-
-            # Очищаем файл с настройками, если он существует
-            settings_file = "telegram_settings.json"
-            if os.path.exists(settings_file):
-                try:
-                    os.remove(settings_file)
-                    QMessageBox.information(
-                        self,
-                        "Настройки сброшены",
-                        "Настройки успешно сброшены к значениям по умолчанию."
-                    )
-                except Exception as e:
-                    QMessageBox.warning(
-                        self,
-                        "Ошибка",
-                        f"Не удалось удалить файл настроек: {str(e)}"
-                    )
+        """Сбрасывает настройки к дефолтным"""
+        if QMessageBox.question(self, "Подтверждение",
+                                "Сбросить настройки?") == QMessageBox.Yes:
+            self.apply_settings(self.load_default_settings())
 
     def get_settings(self):
-        """Возвращает текущие настройки"""
+        """Возвращает текущие настройки из UI"""
         return {
             'bot_token': self.bot_token_edit.text().strip(),
             'chat_id': self.chat_id_edit.text().strip(),
             'threshold': int(self.threshold_edit.text()) if self.threshold_edit.text().strip() else 500,
             'interval': int(self.interval_edit.text()) if self.interval_edit.text().strip() else 30,
-            'auto_start': self.auto_start_check.currentIndex() == 1
+            'auto_start': self.auto_start_combo.currentIndex() == 1
         }
-
-    def set_settings(self, settings):
-        """Устанавливает настройки в форму"""
-        self.bot_token_edit.setText(settings.get('bot_token', ''))
-        self.chat_id_edit.setText(settings.get('chat_id', ''))
-        self.threshold_edit.setText(str(settings.get('threshold', 500)))
-        self.interval_edit.setText(str(settings.get('interval', 30)))
-        self.auto_start_check.setCurrentIndex(1 if settings.get('auto_start', False) else 0)
-
-        # Сохраняем текущие настройки
-        self.current_settings = settings
