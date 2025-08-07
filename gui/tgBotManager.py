@@ -8,7 +8,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 
 class TelegramBotManager(QObject):
-    """Расширенный класс для управления Telegram ботом с улучшенным мониторингом"""
+    """Расширенный класс для управления Telegram ботом"""
     update_status_signal = pyqtSignal(bool)  # Сигнал статуса мониторинга
     alert_signal = pyqtSignal(str, str)  # Сигнал уведомлений (заголовок, сообщение)
 
@@ -226,15 +226,36 @@ class TelegramBotManager(QObject):
 
                     elif text == '/whitelist':
                         reply = message.get('reply_to_message', {})
-                        if not reply.get('text'):
+                        reply_text = reply.get('text', '')
+
+                        if not reply_text:
                             self.send_telegram_message(
                                 "ℹ️ Для управления белым списком ответьте (reply) "
                                 "на сообщение с именем процесса этой командой"
                             )
                             continue
 
-                        proc_name = reply['text'].strip()
+                        # Извлекаем имя процесса из сообщения
+                        proc_name = None
+                        for line in reply_text.split('\n'):
+                            if line.startswith('Процесс: '):
+                                # Извлекаем имя после префикса
+                                proc_name = line.split('Процесс: ')[1].strip()
+                                break
+
+                        if not proc_name:
+                            self.send_telegram_message(
+                                "❌ Не удалось определить имя процесса в сообщении\n"
+                                "Убедитесь, что вы отвечаете на сообщение с уведомлением"
+                            )
+                            continue
+
                         whitelist = self.settings['whitelist']
+                        action = None
+
+                        # Удаляем PID если он есть
+                        if '(' in proc_name:
+                            proc_name = proc_name.split('(')[0].strip()
 
                         if proc_name in whitelist:
                             whitelist.remove(proc_name)

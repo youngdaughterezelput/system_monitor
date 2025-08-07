@@ -309,7 +309,7 @@ class MemoryTab(QWidget):
         self.stop_monitoring()
         event.accept()
 
-
+    """ТГ настройки"""
 class TelegramSettingsDialog(QDialog):
     def __init__(self, parent=None, settings=None):
         super().__init__(parent)
