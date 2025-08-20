@@ -79,6 +79,59 @@ class DefragTab(QWidget):
         self.total_blocks = 0
         self.processed_blocks = 0
 
+
+# для MacOS
+
+
+    def is_macos_admin(self):
+        """Check if running as admin on macOS"""
+        return os.geteuid() == 0
+
+    def analyze_macos(self):
+        try:
+            # На macOS используем diskutil для анализа
+            result = subprocess.run(
+                ["diskutil", "info", self.current_disk],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                self.parse_macos_analysis(result.stdout)
+            else:
+                self.console.append(f"Ошибка анализа: {result.stderr}")
+                
+        except Exception as e:
+            self.console.append(f"Ошибка выполнения анализа: {str(e)}")
+
+    def parse_macos_analysis(self, output):
+        # Анализ информации о файловой системе на macOS
+        self.console.append("Результаты анализа диска:")
+        self.console.append(output)
+        
+        # На macOS дефрагментация обычно не требуется для APFS/HFS+
+        self.fragmentation_data = {"percent": 0}
+        self.update_visualization_state(0)
+        self.defrag_btn.setEnabled(False)
+        self.console.append("На macOS дефрагментация обычно не требуется для современных файловых систем")
+
+    def start_macos_defrag(self):
+        """Дефрагментация на macOS (ограниченная поддержка)"""
+        self.console.append("Дефрагментация на macOS имеет ограниченную поддержку")
+        
+        # Для HFS+ можно попробовать, для APFS - не рекомендуется
+        if "apfs" in self.current_disk.lower():
+            self.console.append("APFS не требует дефрагментации - файловая система оптимизирована автоматически")
+            self.defrag_completed(0)
+            return
+            
+        try:
+            # Для HFS+ можно использовать fsck_hfs
+            self.process.start("sudo", ["fsck_hfs", "-D", self.current_disk])
+        except Exception as e:
+            self.console.append(f"Ошибка запуска дефрагментации: {str(e)}")
+            self.defrag_completed(1)
+
     def update_disk_list(self):
         self.disk_selector.clear()
         for part in psutil.disk_partitions():
@@ -96,8 +149,11 @@ class DefragTab(QWidget):
 
         self.console.append(f"Начало анализа фрагментации для диска {self.current_disk}...")
 
-        if platform.system() == "Windows":
+        system = platform.system()
+        if system == "Windows":
             self.analyze_windows()
+        elif system == "Darwin":  # macOS
+            self.analyze_macos()
         else:
             self.analyze_linux()
 
@@ -196,6 +252,11 @@ class DefragTab(QWidget):
     def start_defragmentation(self):
         if not self.current_disk:
             self.console.append("Ошибка: диск не выбран")
+            return
+
+        system = platform.system()
+        if system == "Darwin":  # macOS
+            self.start_macos_defrag()
             return
 
         self.console.append(f"Начало дефрагментации диска {self.current_disk}...")
@@ -313,3 +374,4 @@ class DefragTab(QWidget):
             return ctypes.windll.shell32.IsUserAnAdmin()
         except:
             return False
+        

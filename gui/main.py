@@ -13,6 +13,7 @@ def is_admin():
     except:
         return False
 
+# main.py
 if __name__ == "__main__":
     # Проверяем, запущен ли в режиме отладки
     is_debug = hasattr(sys, 'gettrace') and sys.gettrace() is not None

@@ -73,14 +73,61 @@ class DiskHealthAnalyzer:
             return None
 
     def get_health(self, device: str) -> Optional[DiskHealth]:
-        if self.system == "Linux" and self.smartctl_path:
+        system = platform.system()
+        
+        if system == "Darwin":  # macOS
+            return self._get_health_macos(device)
+        elif system == "Linux" and self.smartctl_path:
             return self._get_health_smartctl(device)
-        elif self.system == "Windows":
+        elif system == "Windows":
             if self.smartctl_path:
                 return self._get_health_smartctl(device)
             elif self.wmi_available:
                 return self._get_health_wmi(device)
         return None
+    
+    def _get_health_macos(self, device: str) -> Optional[DiskHealth]:
+        """Получение информации о здоровье диска на macOS"""
+        try:
+            # Используем diskutil для получения основной информации
+            info_output = subprocess.run(
+                ["diskutil", "info", device],
+                capture_output=True,
+                text=True,
+                check=True
+            ).stdout
+            
+            # Используем smartctl если доступен
+            if self.smartctl_path:
+                smart_output = subprocess.run(
+                    [self.smartctl_path, "-A", "-i", device],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                ).stdout
+                return self._parse_smartctl(smart_output)
+            else:
+                return self._parse_diskutil(info_output)
+                
+        except Exception as e:
+            logger.error(f"Ошибка получения здоровья диска на macOS для {device}: {str(e)}")
+            return None
+        
+    def _parse_diskutil(self, output: str) -> DiskHealth:
+        """Парсинг вывода diskutil для macOS"""
+        model_match = re.search(r"Device / Media Name:\s+(.+)", output)
+        size_match = re.search(r"Disk Size:\s+([\d.]+ [A-Za-z]+)", output)
+        
+        return DiskHealth(
+            model=model_match.group(1) if model_match else "Unknown",
+            serial="N/A",  # На macOS сложнее получить серийный номер
+            temperature=None,
+            power_on_hours=None,
+            bad_sectors=0,
+            attributes={},
+            lifespan=None,
+            health_status="N/A (требуется smartmontools)"
+        )
 
     def _get_health_smartctl(self, device: str) -> Optional[DiskHealth]:
         try:
